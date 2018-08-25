@@ -1,0 +1,254 @@
+---
+title: "Thanos Snaps the NBA"
+author: "Samad Patel"
+date: "8/16/2018"
+header-includes: 
+- \usepackage{graphicx}
+output: pdf_document
+
+---
+
+Peter Parker is gone. We've had enough time to deal with it. Let's focus on the real issues - how would the NBA Playoffs have turned out if half of each roster was snapped? This module serves to investigate that. 
+
+# Snapping the Players 
+
+The first step is to collect the rosters of the playoffs teams, and then remove half of them. For the sake of argument, we will say LeBron James is Thanos (only due to the LeThanos memes at /r/NBA). He remains on the Cavs by default. 
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+library(readr)
+# FULL ROSTERS 
+
+# Cavs vs Pacers
+cavaliers <- read_csv("~/Rosters/cavaliers.csv", skip = 8, col_names = c('Player'))
+pacers <- read_csv("~/Rosters/pacers.csv", skip = 8, col_names = c('Player'))
+
+# Celtics vs Bucks
+celtics <- read_csv("~/Rosters/celtics.csv", skip = 8, col_names = c('Player'))
+bucks <- read_csv("~/Rosters/bucks.csv", skip = 8, col_names = c('Player'))
+
+# Raptors vs Wizards
+wizards <- read_csv("~/Rosters/wizards.csv", skip = 8, col_names = c('Player'))
+raptors <- read_csv("~/Rosters/raptors.csv", skip = 8, col_names = c('Player'))
+
+# 76rs vs Heat
+phil <- read_csv("~/Rosters/phil.csv", skip = 8, col_names = c('Player'))
+heat <- read_csv("~/Rosters/heat.csv", skip = 8, col_names = c('Player'))
+```
+
+```{r, echo = FALSE}
+myfunc <- function(x){
+   return(gsub("\\\\.*", '', x))
+}
+
+cavaliers$Player <- apply(cavaliers[,1], FUN = myfunc, MARGIN = 2)
+pacers$Player <- apply(pacers[,1], FUN = myfunc, MARGIN = 2)
+celtics$Player <- apply(celtics[,1], FUN = myfunc, MARGIN = 2)
+bucks$Player <- apply(bucks[,1], FUN = myfunc, MARGIN = 2)
+wizards$Player <- apply(wizards[,1], FUN = myfunc, MARGIN = 2)
+raptors$Player <- apply(raptors[,1], FUN = myfunc, MARGIN = 2)
+phil$Player <- apply(phil[,1], FUN = myfunc, MARGIN = 2)
+heat$Player <- apply(heat[,1], FUN = myfunc, MARGIN = 2)
+```
+
+With the exception of LeBron, each player has a 50% chance of remaining on the team. 
+
+```{r}
+# Do Bucks first to make sure it's correct
+# Setting seed to 1 keeps LeBron (LeThanos) so we will keep it as such lol. 
+set.seed(1)
+snap <- function(df){
+   return(df[sample(1:nrow(df), ceiling(nrow(df)/2)), ])
+}
+
+for (team in ls()[sapply(mget(ls()), is.data.frame)]){
+   assign(team, snap(get(team)))
+}
+
+```
+
+# Eastern Conference First Round
+
+## Define Relevant Functions
+```{r}
+# Function to load in and clean names of players
+myread <- function(filepath, skip_num){
+   # Read in dataframe
+   team <- read_csv(filepath, skip = skip_num)
+   # Change name of first column to player
+   colnames(team)[1] <- 'Player'
+   # Clean up player column
+   team$Player <- gsub('\\\\.*', '', team$Player)
+   return(team)
+}
+
+# Function to calculate officiency rating 
+ORTG <- function(team1, team2){
+   FGA <- sum(team1$FGA, na.rm=T)
+   OppFGA <- sum(team2$FGA, na.rm=T)
+   
+   FTA <- sum(team1$FTA, na.rm=T)
+   OppFTA <- sum(team2$FTA, na.rm=T)
+   
+   ORB <- sum(team1$ORB, na.rm=T)
+   OppORB <- sum(team2$ORB, na.rm=T)
+      
+   DRB <- sum(team1$DRB, na.rm=T)
+   OppDRB <- sum(team2$DRB, na.rm=T)
+   
+   FG <- sum(team1$FG, na.rm=T)
+   OppFG <- sum(team2$FG, na.rm=T)
+   
+   TOV <- sum(team1$TOV, na.rm=T)
+   OppTOV <- sum(team2$TOV, na.rm=T)
+   
+   numerator <- 100*sum(team1$PTS)
+   
+   denominator <- (0.5 * ((FGA + 0.4 * FTA - 1.07 * 
+                              (ORB / (ORB + OppDRB)) * (FGA - FG) + TOV) + 
+                             (OppFGA + 0.4 * OppFTA - 1.07 * (OppORB / (OppORB + DRB)) *
+                                 (OppFGA - OppFG) + OppTOV)))
+   
+   return(numerator/denominator)
+}
+
+# Function to calculate score 
+scores <- function(home_OE, home_DE, away_OE, away_DE, home_pace, away_pace,
+                   home_team_name, away_team_name){
+  # Calculate adjusted efficiency based on being away or home 
+  home_OE_adj <- home_OE * 1.015 # Gives home court advantage 
+  home_DE_adj <- home_DE * .985
+  
+  away_OE_adj <- away_OE * .985
+  away_DE_adj <- away_DE * 1.015
+  
+  # Calculate adjusted pace
+  LA_pace <- 97.3 # Taken from basketballreference
+  adj_pace <- (home_pace*away_pace)/LA_pace
+  
+  # Points per posession 
+  LA_ORTG <- 106.3
+  home_ppp <- (home_OE_adj*away_DE_adj) / LA_ORTG
+  away_ppp <- (away_OE_adj*home_DE_adj) / LA_ORTG
+  
+  # Final Scores
+  home_points <- floor((home_ppp*adj_pace)/100)
+  away_points <- floor((away_ppp*adj_pace)/100)
+  
+  return(paste('Final: ', home_team_name, ' - ', home_points, ', ', away_team_name, ' - ', away_points, sep = ''))
+}
+```
+
+## Round 1: Celtics Vs Bucks
+### Game 1
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Load the initial team dataframes for game 1
+team1 <- myread('~/Desktop/Celtics Vs Bucks/celtics_1.csv', skip_num = 7)
+team2 <- myread('~/Desktop/Celtics Vs Bucks/bucks_1.csv', skip_num = 7)
+
+# Keep only rows with non-snapped players
+team1 <- team1[which(celtics$Player %in% team1$Player), ]
+team2 <- team2[which(bucks$Player %in% team2$Player), ]
+
+team1_ORTG <- ORTG(team1, team2)
+team2_ORTG <- ORTG(team2, team1)
+
+team1_DRTG <- (100.4/100.6)*100
+team2_DRTG <- (106.8/99.1)*100
+
+scores(team1_ORTG, team1_DRTG, team2_ORTG, team2_DRTG, 96.5, 96.5, 'Celtics', 'Bucks')
+```
+
+### Game 2
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+# Load the initial team dataframes for game 2
+team1 <- myread('~/Desktop/Celtics Vs Bucks/celtics_2.csv', skip_num = 7)
+team2 <- myread('~/Desktop/Celtics Vs Bucks/bucks_2.csv', skip_num = 7)
+
+# Keep only rows with non-snapped players
+team1 <- team1[which(celtics$Player %in% team1$Player), ]
+team2 <- team2[which(bucks$Player %in% team2$Player), ]
+
+team1_ORTG <- ORTG(team1, team2)
+team2_ORTG <- ORTG(team2, team1)
+
+team1_POS <- 99.1
+team2_POS <- 100.6
+
+team1_DRTG <- (100.4/team2_POS)*100
+team2_DRTG <- (106.8/team1_POS)*100
+
+scores(team1_ORTG, team1_DRTG, team2_ORTG, team2_DRTG, 92.5, 92.5, 'Celtics', 'Bucks')
+```
+
+### Game 3
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+team1 <- myread('~/Desktop/Celtics Vs Bucks/bucks_3.csv', skip_num = 7)
+team2 <- myread('~/Desktop/Celtics Vs Bucks/celtics_3.csv', skip_num = 7)
+
+# Keep only rows with non-snapped players
+team1 <- team1[which(bucks$Player %in% team1$Player), ]
+team2 <- team2[which(celtics$Player %in% team2$Player), ]
+
+team1_ORTG <- ORTG(team1, team2)
+team2_ORTG <- ORTG(team2, team1)
+
+team2_POS <- 99.1
+team1_POS <- 100.6
+
+team1_OPA <- 106.8
+team2_OPA <- 100.4
+
+team1_DRTG <- (team1_OPA/team2_POS)*100
+team2_DRTG <- (team2_OPA/team1_POS)*100
+
+scores(team1_ORTG, team1_DRTG, team2_ORTG, team2_DRTG, 87.7, 87.7, 'Bucks', 'Celtics')
+```
+
+### Game 4
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+team1 <- myread('~/Desktop/Celtics Vs Bucks/bucks_4.csv', skip_num = 7)
+team2 <- myread('~/Desktop/Celtics Vs Bucks/celtics_4.csv', skip_num = 7)
+
+# Keep only rows with non-snapped players
+team1 <- team1[which(bucks$Player %in% team1$Player), ]
+team2 <- team2[which(celtics$Player %in% team2$Player), ]
+
+team1_ORTG <- ORTG(team1, team2)
+team2_ORTG <- ORTG(team2, team1)
+
+team2_POS <- 99.1
+team1_POS <- 100.6
+
+team1_DRTG <- (106.8/team2_POS)*100
+team2_DRTG <- (100.4/team1_POS)*100
+
+scores(team1_ORTG, team1_DRTG, team2_ORTG, team2_DRTG, 88.3, 88.3, 'Bucks', 'Celtics')
+```
+
+### Game 5
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+# Load the initial team dataframes for game 2
+team1 <- myread('~/Desktop/Celtics Vs Bucks/celtics_5.csv', skip_num = 7)
+team2 <- myread('~/Desktop/Celtics Vs Bucks/bucks_5.csv', skip_num = 7)
+
+# Keep only rows with non-snapped players
+team1 <- team1[which(celtics$Player %in% team1$Player), ]
+team2 <- team2[which(bucks$Player %in% team2$Player), ]
+
+team1_ORTG <- ORTG(team1, team2)
+team2_ORTG <- ORTG(team2, team1)
+
+team1_POS <- 99.1
+team2_POS <- 100.6
+
+team1_DRTG <- (100.4/team2_POS)*100
+team2_DRTG <- (106.8/team1_POS)*100
+
+scores(team1_ORTG, team1_DRTG, team2_ORTG, team2_DRTG, 92.5, 92.5, 'Celtics', 'Bucks')
+```
+
+## Round 1: Cavaliers Vs Pacers
+```{r, message=FALSE}
+
+```
+
