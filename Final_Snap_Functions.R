@@ -165,3 +165,41 @@ Determine_Series <- function(urls, Team1_Abb, Team2_Abb){
       print(df)
    }
 }
+
+# Inputs url from very last game, tiebreaks based on overall season performance of relevant players
+TieBreaker <- function(url, Team1_Abb, Team2_Abb){
+   # Generate URL for Team 1 - will be used to generate PPG
+   Team1_url <- paste('https://www.basketball-reference.com/teams/', 
+                      toupper(Team1_Abb), '/2018.html', 
+                      sep = '')
+   # Generate the ppg df
+   page <- render_html(url = Team1_url, wait = 1)
+   Team1_PPG <- (page %>% html_nodes('#per_game') %>% html_table())[[1]]
+   colnames(Team1_PPG)[2] <- 'Name'
+   
+   # Generate URL for Team 2 - will be used to generate PPG
+   Team2_url <- paste('https://www.basketball-reference.com/teams/', 
+                      toupper(Team2_Abb), '/2018.html', 
+                      sep = '')
+   # Generate the ppg df
+   page <- render_html(url = Team2_url, wait = 1)
+   Team2_PPG <- (page %>% html_nodes('#per_game') %>% html_table())[[1]]
+   colnames(Team2_PPG)[2] <- 'Name'
+   
+   # Use last url from the relevant series to generate the PPG for the relevant players
+   # Team 1
+   relevant_players_1 <- boxscore(url, Team1_Abb)$Starters
+   Team1_Total <- sum(Team1_PPG[Team1_PPG$Name %in% relevant_players_1, 'PTS/G'])
+   
+   # Team 2
+   relevant_players_2 <- boxscore(url, Team2_Abb)$Starters
+   Team2_Total <- sum(Team2_PPG[Team2_PPG$Name %in% relevant_players_2, 'PTS/G'])
+   
+   # Determine winner
+   # Clause if ppg is somehow equal
+   if (Team1_Total == Team2_Total)
+      break()
+   if (Team1_Total > Team2_Total)
+      print(paste('The winner of the series is', toupper(Team1_Abb)))
+   else (print(paste('The winner of the series is', toupper(Team2_Abb))))
+}
