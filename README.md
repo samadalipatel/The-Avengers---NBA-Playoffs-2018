@@ -5,7 +5,9 @@ Major aspects of this project: Data collection, data cleaning, algorithm design.
 
 ### What this Repository Contains: 
 **Rosters** - Dataframes containing names and information about each player on each NBA Team for the 2017-2018 season. 
+
 **Code** - All the code written to obtain data, and the functions that went into the final write up. Note that the files that include _Beta_ in their names contain original drafts and tests of functions that are found in _Final_Snap_Functions.R._ 
+
 **Write-Ups** - Contains code for and pdf outputs of both my initial and final write-ups for the project. 
 
 ## Part One: The Snap
